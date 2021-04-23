@@ -1,0 +1,56 @@
+
+on:
+  push:
+    branches: [ develop ]
+
+jobs:
+  cool-weather:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+          python-version: '3.8'
+    - name: Build client
+      run: |
+        echo "*** Building client"
+        server_pwd=$PWD
+        cd omdbweather/frontend/cool-ui
+        npm install
+        mkdir $server_pwd/omdbweather/client_files
+        npm run build -- --output-path $server_pwd/omdbweather/client_files
+        cd -
+    - name: Build server
+      run: |
+        echo "*** Building Server"
+        pip install virtualenv
+        python setup.py clean --all
+
+        virtualenv venv
+        source venv/bin/activate
+
+        pip install -r requirements.txt
+        ls -l omdbweather/client_files
+    - name: Build Docker
+      run: |
+        TAG=latest
+        REPO=omdbweather
+        IMAGE=omdbweather
+
+        docker build  -t $REPO/$IMAGE:$TAG -f Dockerfile .
+        docker image ls
+
+    - name: Push Docker
+      run: |
+        # Login to Docker
+        echo Login to docker hub with username: omdbweather
+        docker login --username omdbweather --password omdbweather > /dev/null 2>&1
+        if [ $? -ne 0 ]; then
+            echoerr failed to Login to docker hub repo
+            docker logout
+            exit 1
+        fi
+        docker push omdbweather/omdbweather
+    - name: Deploy
+      run: |
+          curl -X POST https://$cool-ui:KXRpAMq0cMZKuYboexbfzqlnDi6bqsQbjlW1rqvtHBbYDF1gFqrszxv4RDom@cool-ui.scm.azurewebsites.net/docker/hook
